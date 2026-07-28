@@ -46,3 +46,5 @@ jupyter notebook
 ```
 
 Run `notebook/recommender_pipeline.ipynb` — it builds the database, generates the features, and walks through scoring, evaluation, and the fixes made along the way.
+
+![Architecture](assets/architecture.svg)
