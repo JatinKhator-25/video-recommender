@@ -25,7 +25,7 @@ personalized guess, since there's no data yet to base one on.
 ## Stack
 
 Python · pandas · scikit-learn · SQLite · Jupyter
-```
+
 
 ## Running it
 
