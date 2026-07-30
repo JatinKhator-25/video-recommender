@@ -25,17 +25,6 @@ personalized guess, since there's no data yet to base one on.
 ## Stack
 
 Python · pandas · scikit-learn · SQLite · Jupyter
-
-## Files
-
-```
-video-recommender/
-├── data/                recommender.db
-├── notebook/
-│   ├── recommender_pipeline.ipynb   earlier version (similarity-based)
-│   └── ml_recommender.ipynb         current version (logistic regression)
-├── requirements.txt
-└── README.md
 ```
 
 ## Running it
