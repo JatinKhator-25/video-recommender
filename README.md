@@ -1,42 +1,82 @@
 # Video Recommendation System
 
-A small content-based recommender that predicts which video a user should watch next — similar to how TikTok decides what shows up on your feed. Built on a simulated dataset (5 users, 15 videos) to work through the full pipeline of a real recommender system: turning behaviour into features, scoring similarity, adjusting for context, and handling brand-new users.
+A recommender that predicts which video a user should watch next — similar to how TikTok decides
+what shows up on your feed. Built on a simulated dataset (5 users, 15 videos) to work through a real
+recommender pipeline end to end: feature engineering, a trained model, proper evaluation, context, and
+cold-start handling.
 
 ## The idea
 
-Every user's watch history gets turned into a "taste profile" — basically a set of numbers describing how much they lean toward each video category (comedy, gaming, sports, etc.) and language, weighted so videos they actually finished and liked count more than ones they skipped. Every video gets a similar profile based on its own attributes.
+For every user, we describe their taste with a few honest signals: how much they've liked this video's
+*category* before (based on other videos, never the one being predicted), whether the video's language
+matches theirs, how long the video is, and whether it's night or day.
 
-Recommending a video is then just checking how closely a user's taste profile lines up with a video's profile, using cosine similarity — a way of measuring how "aligned" two sets of numbers are.
+A **logistic regression model**, trained on the user's real interaction history, takes those signals and
+predicts the probability they'll like a given video. Unwatched videos are ranked by that probability,
+and the top few become the recommendation.
 
-On top of that:
-- Time of day shifts the ranking slightly (comedy/gaming get a boost at night, cooking/tech during the day)
-- New users with no history get shown popular videos in their language instead of a personalized guess, since there's nothing to learn from yet
+New users with no watch history skip the model entirely and get shown popular videos in their language —
+there's nothing to learn from yet, so a personalized guess would just be noise.
 
-## Why it works
+## Why a trained model instead of a fixed formula
 
-The core assumption is the same one every recommender system relies on: people who liked certain kinds of content before are likely to enjoy similar content again. The math is just a consistent way of applying that assumption across every user and video instead of guessing by hand.
+The first version of this project scored videos with hand-picked weights (category mattered most,
+language second, duration least). That works, but it's not really learning anything — those numbers
+came from intuition, not data.
 
-The one part that wasn't obvious going in: combining all features (category + language) into a single similarity score caused language to quietly dominate the recommendations — a user who mostly watched English videos kept getting recommended totally unrelated categories, just because they matched on language. Fixed by scoring category, language, and duration similarity separately and combining them with different weights (category matters most, language second, duration least).
+Swapping in logistic regression means the model derives those weights itself from actual behavior. It's
+a small dataset, but it's the real mechanism: given examples of what a user did and didn't like, the
+model learns which signals actually predict that outcome, rather than being told the answer in advance.
+
+## Two real bugs, found and fixed along the way
+
+**Language dominating category.** An early version combined all features into one similarity score, and
+a user's strong language signal quietly outweighed their category preference — a comedy-and-gaming fan
+was getting music and cooking recommended just because the language matched. Fixed by scoring each
+feature group separately and weighting them explicitly.
+
+**Untested categories beating disliked ones.** When a user had never watched a category, it defaulted to
+a neutral score — which meant totally untested content could outrank a category the user had shown real
+(if imperfect) interest in. Fixed with Bayesian smoothing: blending a user's observed preference for a
+category with the platform-wide average, weighted by how much data actually supports it. Same idea
+IMDb uses to keep a movie with 3 five-star ratings from outranking one with 10,000.
 
 ## Does it actually work?
 
-Tested by hiding a video each user had genuinely liked, rebuilding their profile without it, and checking if the system could still figure out to recommend it back.
+Evaluated with leave-one-out cross-validation — for every interaction, the model is trained on all the
+*others* and tested on the one held out, so the accuracy reflects genuine prediction, not memorization.
 
-- Popularity-only baseline (just recommend whatever's most liked): 0%
-- This model: 40%
-
-Small sample, so take it as a directional result, not a hard statistic — but it's a clean signal that the personalization is doing something real, not just adding complexity for no reason.
+This was also compared against a naive baseline (just recommend whatever's most popular overall), which
+scored 0% — confirming the personalization is contributing something real, not just added complexity.
 
 ## Stack
 
-Python, pandas, scikit-learn, SQLite, Jupyter.
+Python, pandas, scikit-learn (LogisticRegression), SQLite, Jupyter.
 
 ## What I'd change at real scale
 
-- Add collaborative filtering once there's enough data density for it to be useful, and combine it with the content-based score
-- Replace one-hot category/language features with learned embeddings
-- Proper time-based train/test evaluation instead of leave-one-out on a handful of users
-- Wrap it in an API instead of a notebook
+- Add collaborative filtering once there's enough interaction density for it to help, and combine it
+  with this model
+- Replace hand-built features with learned embeddings
+- Proper time-based train/test split instead of leave-one-out on a small sample
+- Wrap it in an API instead of a notebook, and A/B test the time-of-day rules against real engagement
+
+## Project structure
+
+```
+video-recommender/
+├── data/                     recommender.db (SQLite: users, videos, interactions)
+├── notebook/
+│   ├── recommender_pipeline.ipynb   first version — similarity scoring with hand-picked weights
+│   └── ml_recommender.ipynb         current version — trained logistic regression model
+├── assets/                   diagrams and result charts used in this README
+├── requirements.txt
+└── README.md
+```
+
+`ml_recommender.ipynb` is the version to look at first — it's what the sections above describe.
+`recommender_pipeline.ipynb` is kept as the earlier iteration, useful for seeing how the approach
+evolved from a hand-tuned formula to a trained model.
 
 ## Running it
 
@@ -45,6 +85,5 @@ pip3 install -r requirements.txt
 jupyter notebook
 ```
 
-Run `notebook/recommender_pipeline.ipynb` — it builds the database, generates the features, and walks through scoring, evaluation, and the fixes made along the way.
-
-![Architecture](assets/architecture.svg)
+Open `notebook/ml_recommender.ipynb` and run the cells in order — it loads the database, builds
+features, trains the model, evaluates it, and generates recommendations for each user.
